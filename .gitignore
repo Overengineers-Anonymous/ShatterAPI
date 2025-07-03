@@ -1,4 +1,8 @@
 __pycache__
 .pytest_cache
 shatter_api/test.py
+shatter_api/mapping.py
 dist
+.coverage
+**/profile.txt
+**/test.prof
