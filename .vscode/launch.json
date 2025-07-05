@@ -15,7 +15,7 @@
                 "wsgi",
             ],
             "jinja": true,
-            "cwd": "${workspaceFolder}/shatter_api"
+            "cwd": "${workspaceFolder}"
         }
     ]
 }
