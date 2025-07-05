@@ -13,7 +13,7 @@ from pydantic import BaseModel, ValidationError
 from .request import RequestBody, RequestCtx, RequestHeaders, RequestQueryParams
 from .responses import BaseHeaders, Response, ResponseInfo, ValidationErrorResponse, get_response_info
 from .utils import has_base, ApiFuncSig
-
+from .middlewear import Middleware
 
 class ApiDescriptor(Protocol):
     mapping: "Mapping"
@@ -30,11 +30,23 @@ class ApiEndpoint:
     Represents a single API endpoint with a specific path and function signature.
     """
 
-    def __init__(self, path: str, func: Callable):
+    def __init__(self, path: str, func: Callable, middleware: list[Middleware] | None = None):
         self.path = path
         self.func_sig = ApiFuncSig.from_func(func)
         self._owner: type[ApiDescriptor] | None = None
         self.func = func
+        self.middleware = self.build_middleware(middleware)
+
+    @staticmethod
+    def build_middleware(middleware: list[Middleware] | None) -> list[Middleware]:
+        """
+        Build a list of middleware for the endpoint.
+        """
+        if middleware is None:
+            return []
+        if not isinstance(middleware, list):
+            raise TypeError("Middleware must be a list of Middleware instances")
+        return middleware
 
     @property
     def response_descr(self) -> list[ResponseInfo]:
@@ -75,21 +87,7 @@ class ApiEndpoint:
             else:
                 raise TypeError(f"Unsupported type '{_type}' for argument '{arg}' in function '{func_sig.name}'")
         return args
-    def _get_func_kwargs(self, func_sig: ApiFuncSig, req: RequestCtx) -> dict[str, Any]:
-        func_kwargs = func_sig.kwargs
-        kwargs = {}
-        for arg, _type in func_kwargs.items():
-            if issubclass(_type, RequestBody):
-                kwargs[arg] = _type.model_validate(req.body)
-            elif issubclass(_type, RequestCtx):
-                kwargs[arg] = req
-            elif issubclass(_type, RequestHeaders):
-                kwargs[arg] = _type.model_validate(req.headers)
-            elif issubclass(_type, RequestQueryParams):
-                kwargs[arg] = _type.model_validate(req.query_params)
-            else:
-                raise TypeError(f"Unsupported type '{_type}' for argument '{arg}' in function '{func_sig.name}'")
-        return kwargs
+
     def __call__(self, obj: object, req: RequestCtx) -> Response[BaseModel, int, BaseHeaders]:
         func = getattr(obj, self.func_sig.name, None)
         if func is None or not callable(func):
@@ -158,9 +156,9 @@ class Mapping:
         self.routes: dict[str, ApiEndpoint] = {}
         self._owner: type[ApiDescriptor] | None = None
 
-    def route(self, path: str):
+    def route(self, path: str, middleware: list[Middleware] | None = None) -> Callable:
         def register(func: Callable) -> Callable:
-            self.routes[path] = ApiEndpoint(path, func)
+            self.routes[path] = ApiEndpoint(path, func, middleware)
             return func
 
         return register
