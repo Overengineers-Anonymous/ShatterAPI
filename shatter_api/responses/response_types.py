@@ -52,6 +52,18 @@ class NotFoundResponse(JsonResponse[NotFoundData, Literal[404], JsonHeaders]):
     def __init__(self):
         super().__init__(NotFoundData(), 404, JsonHeaders())
 
+class MethodNotAllowedData(BaseModel):
+    """
+    This is a sample data model for the Method Not Allowed response.
+    """
+
+    detail: str = "Method Not Allowed"
+
+class MethodNotAllowedResponse(
+    JsonResponse[MethodNotAllowedData, Literal[405], JsonHeaders]
+):
+    def __init__(self):
+        super().__init__(MethodNotAllowedData(), 405, JsonHeaders())
 
 class ValidationErrorInfo(BaseModel):
     loc: list[str | int] = []

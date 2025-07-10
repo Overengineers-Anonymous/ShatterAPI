@@ -4,7 +4,7 @@ from pydantic import ValidationError
 
 from ..call_builder import CallCtx, CallDispatcher, CallDispatcherInterface
 from ..middlewear import CallNext, Middleware, MiddlewareDispatcher
-from ..request import RequestCtx
+from ..request import ReqType, RequestCtx
 from ..responses import (
     ResponseInfo,
     ValidationErrorResponse,
@@ -21,8 +21,9 @@ class ApiEndpoint:
     Represents a single API endpoint with a specific path and function signature.
     """
 
-    def __init__(self, path: str, func: Callable, middlewares: list[Middleware]):
+    def __init__(self, path: str, func: Callable, req_type: ReqType, middlewares: list[Middleware]):
         self.path = path
+        self.req_type = req_type
         self.func_sig = ApiFuncSig.from_func(func)
         self.call_dispatcher = CallDispatcher(func)
         self._owner: "type[Api] | None" = None

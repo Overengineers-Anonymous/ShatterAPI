@@ -1,28 +1,32 @@
-from ..request import RequestCtx
-from ..responses.responses import middleware_response
+from ..request import RequestCtx, ReqType
+from ..responses import middleware_response, MethodNotAllowedResponse
 from ..utils import has_base
 from .endpoints import ApiEndpoint, ApiExecutor
 from .api import Api
 
-
 class BoundApiDescriptor:
-    def __init__(self, paths: dict[str, ApiExecutor], owner: object):
+    def __init__(self, paths: dict[ReqType, dict[str, ApiExecutor]], methods: dict[str, list[ReqType]], owner: object):
         self.paths = paths
+        self.methods = methods
         self.owner = owner
 
-    def dispatch(self, path: str, req: RequestCtx) -> middleware_response:
-        endpoint = self.paths[path]
+    def dispatch(self, req: RequestCtx) -> middleware_response | MethodNotAllowedResponse:
+        if req.req_type not in self.methods[req.path]:
+            return MethodNotAllowedResponse()
+        endpoint = self.paths[req.req_type][req.path]
         return endpoint(self.owner, req)
 
 
 class ApiDescription:
     def __init__(self, owner: type[Api]):
-        self.paths: dict[str, ApiEndpoint] = {}
+        self.paths: dict[ReqType, dict[str, ApiEndpoint]] = {}
+        self.methods: dict[str, list[ReqType]] = {}
         self.function_names: dict[str, ApiEndpoint] = {}
         self.owner = owner
 
-    def add_path(self, path: str, api_endpoint: ApiEndpoint):
-        if eapi_endpoint := self.paths.get(path):
+    def add_path(self, req_type: ReqType, path: str, api_endpoint: ApiEndpoint):
+        request_paths = self.paths.setdefault(req_type, {})
+        if eapi_endpoint := request_paths.get(path):
             if eapi_endpoint.func_sig.name != api_endpoint.func_sig.name:
                 raise TypeError(
                     f"ApiDescriptor '{api_endpoint.owner.__name__}' rebinds path '{path}' to another method '{api_endpoint.func_sig.name}'"
@@ -37,7 +41,10 @@ class ApiDescription:
                     f"Method '{api_endpoint.func_sig.name}' is already bound to path '{eapi_endpoint.path}' in ApiDescriptor '{eapi_endpoint.owner.__name__}'"
                 )
         self.function_names[api_endpoint.func_sig.name] = api_endpoint
-        self.paths[path] = api_endpoint
+        methods = self.methods.setdefault(path, [])
+        if req_type not in methods:
+            methods.append(req_type)
+        request_paths[path] = api_endpoint
 
     def bind(self, obj: object) -> BoundApiDescriptor:
         """
@@ -48,9 +55,11 @@ class ApiDescription:
             raise TypeError(
                 f"{obj.__class__.__name__} must inherit from ApiDescriptor to bind API description"
             )
-        paths = {}
-        for path, api_endpoint in self.paths.items():
-            api_executor = ApiExecutor(api_endpoint, obj)
-            paths[path] = api_executor
-        bound_api_descr = BoundApiDescriptor(paths, obj)
+        paths: dict[ReqType, dict[str, ApiExecutor]] = {}
+        for req_type, path_data in self.paths.items():
+            request_paths = paths.setdefault(req_type, {})
+            for path, api_endpoint in path_data.items():
+                api_executor = ApiExecutor(api_endpoint, obj)
+                request_paths[path] = api_executor
+        bound_api_descr = BoundApiDescriptor(paths, self.methods, obj)
         return bound_api_descr

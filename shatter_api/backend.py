@@ -19,9 +19,10 @@ class WsgiDispatcher:
         """
         query_params = parse_qs(environ.get("QUERY_STRING", ""))
         query_params = {k: v[0] for k, v in query_params.items()}
-
+        path = environ.get("PATH_INFO", "/")
         reqctx = RequestCtx.new(
             ReqType(environ["REQUEST_METHOD"]),
+            path,
             body=environ.get("wsgi.input"),
             headers={
                 k.replace("HTTP_", ""): v
@@ -31,9 +32,9 @@ class WsgiDispatcher:
             query_params=query_params,
         )
 
-        path = environ.get("PATH_INFO", "/")
+
         try:
-            response = self.api_descriptor.mapping.dispatch(path, reqctx)
+            response = self.api_descriptor.mapping.dispatch(reqctx)
         except KeyError:
             response = NotFoundResponse()
 

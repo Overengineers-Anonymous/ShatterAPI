@@ -5,7 +5,7 @@ from ..utils import has_base
 from .descriptors import ApiDescription, BoundApiDescriptor
 from .endpoints import ApiEndpoint
 from .api import Api
-
+from ..request import ReqType
 
 
 class Mapping:
@@ -15,14 +15,15 @@ class Mapping:
     def __init__(self, subpath: str = "", middleware: list[Middleware] | None = None):
         self.middleware = middleware or []
         self.subpath = subpath
-        self.routes: dict[str, ApiEndpoint] = {}
+        self.routes: dict[ReqType, dict[str, ApiEndpoint]] = {}
         self._owner: type[Api] | None = None
 
-    def route(self, path: str, middleware: list[Middleware] | None = None) -> Callable:
+    def route(self, path: str, methods: list[ReqType] | None = None, middleware: list[Middleware] | None = None) -> Callable:
         middleware = middleware or self.middleware
-
+        methods = methods or [ReqType.GET]
         def register(func: Callable) -> Callable:
-            self.routes[path] = ApiEndpoint(path, func, self.middleware + middleware)
+            for req_type in methods:
+                self.routes.setdefault(req_type, {})[path] = ApiEndpoint(path, func, req_type, self.middleware + middleware)
             return func
 
         return register
@@ -32,8 +33,11 @@ class Mapping:
         for base in owner.__mro__[::-1]:
             mapping = getattr(base, "mapping", None)
             if isinstance(mapping, Mapping):
-                for path, api_endpoint in mapping.routes.items():
-                    api_description.add_path(path, api_endpoint)
+                for req_type, path_data in mapping.routes.items():
+                    for path, api_endpoint in path_data.items():
+                        if not api_endpoint.path.startswith(self.subpath):
+                            api_endpoint.path = self.subpath + api_endpoint.path
+                        api_description.add_path(req_type, path, api_endpoint)
         setattr(owner, self.API_DESCR_NAME, api_description)
         return api_description
 
@@ -51,8 +55,9 @@ class Mapping:
             )
         if name != "mapping":
             raise TypeError(f"Mapping must be named 'mapping', not '{name}'")
-        for api_endpoint in self.routes.values():
-            api_endpoint.owner = owner
+        for api_paths in self.routes.values():
+            for api_endpoint in api_paths.values():
+                api_endpoint.owner = owner
 
     @overload
     def __get__(self, obj: None, objtype: type) -> "Mapping": ...

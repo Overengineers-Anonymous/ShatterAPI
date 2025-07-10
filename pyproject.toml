@@ -1,6 +1,6 @@
 [project]
 name = "shatter-api"
-version = "v0.1.2"
+version = "v0.2.0"
 description = "A self-hosted, pluggable mirror for secret stores providing a consistent API & offline access for your secrets."
 authors = [
     {name = "ripple",email = "github@ripplefcl.com>, tigattack <?"}
@@ -19,9 +19,7 @@ dependencies = [
 packages = [
     {include = "shatter_api"}
 ]
-exclude = [
-    { path  = ""}
-]
+
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.11.11"
 pytest = "^8.3.5"

@@ -26,10 +26,12 @@ class RequestCtx:
     def __init__(
         self,
         req_type: ReqType,
+        path: str,
         body: Any,
         headers: dict[str, str],
         query_params: dict[str, str],
     ) -> None:
+        self.path = path
         self.req_type: ReqType = req_type
         self.body: dict[str, Any] = {"body": body}
         self.headers: dict[str, str] = headers if headers is not None else {}
@@ -41,6 +43,7 @@ class RequestCtx:
     def new(
         cls,
         req_type: ReqType,
+        path: str,
         body: Any = None,
         headers: dict[str, str] | None = None,
         query_params: dict[str, str] | None = None,
@@ -54,7 +57,7 @@ class RequestCtx:
         if query_params is None:
             query_params = {}
         return cls(
-            req_type=req_type, body=body, headers=headers, query_params=query_params
+            req_type=req_type, path=path, body=body, headers=headers, query_params=query_params
         )
 
 
