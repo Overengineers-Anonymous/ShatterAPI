@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Any
+
 from pydantic import BaseModel
 
 
@@ -22,11 +23,19 @@ class ReqType(Enum):
 
 
 class RequestCtx:
-    def __init__(self, req_type: ReqType, body: Any, headers: dict[str, str], query_params: dict[str, str]) -> None:
+    def __init__(
+        self,
+        req_type: ReqType,
+        body: Any,
+        headers: dict[str, str],
+        query_params: dict[str, str],
+    ) -> None:
         self.req_type: ReqType = req_type
         self.body: dict[str, Any] = {"body": body}
         self.headers: dict[str, str] = headers if headers is not None else {}
-        self.query_params: dict[str, str] = query_params if query_params is not None else {}
+        self.query_params: dict[str, str] = (
+            query_params if query_params is not None else {}
+        )
 
     @classmethod
     def new(
@@ -39,11 +48,14 @@ class RequestCtx:
         if headers is None:
             headers = {}
         else:
-            headers = {from_header_name(k): v for k, v in headers.items()}  # FIXME: handle headers with underscores
+            headers = {
+                from_header_name(k): v for k, v in headers.items()
+            }  # FIXME: handle headers with underscores
         if query_params is None:
             query_params = {}
-        return cls(req_type=req_type, body=body, headers=headers, query_params=query_params)
-
+        return cls(
+            req_type=req_type, body=body, headers=headers, query_params=query_params
+        )
 
 
 class RequestBody(BaseModel): ...
@@ -56,7 +68,12 @@ class RequestQueryParams(BaseModel): ...
 
 
 class RequestInfo:
-    def __init__(self, body: type[RequestBody], headers: type[RequestHeaders], query_params: type[RequestQueryParams]) -> None:
+    def __init__(
+        self,
+        body: type[RequestBody],
+        headers: type[RequestHeaders],
+        query_params: type[RequestQueryParams],
+    ) -> None:
         self.body = body
         self.headers = headers
         self.query_params = query_params

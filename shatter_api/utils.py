@@ -1,8 +1,9 @@
 import inspect
-from typing import Any, Callable, Union, get_origin, get_args
+from typing import Any, Callable, Union, get_args, get_origin
 
 from pydantic import BaseModel
-from .responses import InheritedResponses, Response
+
+from .responses.responses import InheritedResponses, Response
 
 
 def has_base(cls: type, base_cls: type):
@@ -12,7 +13,13 @@ def has_base(cls: type, base_cls: type):
 
 
 class ApiFuncSig:
-    def __init__(self, args: dict[str, type], kwargs: dict[str, type], return_type: type, name: str):
+    def __init__(
+        self,
+        args: dict[str, type],
+        kwargs: dict[str, type],
+        return_type: type,
+        name: str,
+    ):
         self.args = args
         self.kwargs = kwargs
         self.defaults: dict[str, Any] = {}
@@ -28,13 +35,17 @@ class ApiFuncSig:
             if param.name == "self":
                 continue
             if not param.annotation:
-                raise TypeError(f"Parameter '{param.name}' in function '{func.__name__}' must have a type annotation")
+                raise TypeError(
+                    f"Parameter '{param.name}' in function '{func.__name__}' must have a type annotation"
+                )
             if param.default is not inspect.Parameter.empty:
                 kwargs[param.name] = param.annotation
             else:
                 args[param.name] = param.annotation
         return_type = sig.return_annotation
-        func_sig = cls(args=args, kwargs=kwargs, return_type=return_type, name=func.__name__)
+        func_sig = cls(
+            args=args, kwargs=kwargs, return_type=return_type, name=func.__name__
+        )
         func_sig.validate()
         return func_sig
 
@@ -90,7 +101,7 @@ class ApiFuncSig:
 
     def validate(self):
         if get_origin(self.return_type) is Union:
-            union_args =  get_args(self.return_type)
+            union_args = get_args(self.return_type)
         else:
             union_args = (self.return_type,)
         for type_ in union_args:
@@ -104,7 +115,9 @@ class ApiFuncSig:
             elif issubclass(type_, BaseModel):
                 continue
             if type_ is inspect._empty:
-                raise TypeError(f"Return type in function '{self.name}' is not annotated.")
+                raise TypeError(
+                    f"Return type in function '{self.name}' is not annotated."
+                )
             raise TypeError(
                 f"Return type '{type_.__name__}' in function '{self.name}' must be a subclass of Response, str, or BaseModel"
             )

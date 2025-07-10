@@ -1,7 +1,8 @@
-from .request import ReqType
-from .responses import NotFoundResponse
-from .api import Api, RequestCtx
 from urllib.parse import parse_qs
+
+from .api import Api
+from .request import ReqType, RequestCtx
+from .responses import NotFoundResponse
 
 
 class WsgiDispatcher:
@@ -22,7 +23,11 @@ class WsgiDispatcher:
         reqctx = RequestCtx.new(
             ReqType(environ["REQUEST_METHOD"]),
             body=environ.get("wsgi.input"),
-            headers={k.replace("HTTP_", ""): v for k, v in environ.items() if k.startswith("HTTP_")},
+            headers={
+                k.replace("HTTP_", ""): v
+                for k, v in environ.items()
+                if k.startswith("HTTP_")
+            },
             query_params=query_params,
         )
 

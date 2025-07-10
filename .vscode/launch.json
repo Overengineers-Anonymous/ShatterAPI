@@ -10,7 +10,7 @@
             "request": "launch",
             "module": "uvicorn",
             "args": [
-                "mapping:dispatcher",
+                "test2:dispatcher",
                 "--interface",
                 "wsgi",
                 "--host",

@@ -1,9 +1,9 @@
-from pydantic import BaseModel
+from typing import Callable, Protocol
 
-from shatter_api.core.utils import ApiFuncSig
-from .request import RequestCtx, RequestBody, RequestHeaders, RequestQueryParams
-from typing import Any, Callable, Protocol
-from .responses import Response, BaseHeaders, middleware_response
+from .request import RequestBody, RequestCtx, RequestHeaders, RequestQueryParams
+from .responses.responses import middleware_response
+from .utils import ApiFuncSig
+
 
 class CallCtx:
     def __init__(self, ctx: RequestCtx):
@@ -64,6 +64,7 @@ class CallCtx:
 class CallDispatcherInterface(Protocol):
     def dispatch(self, ctx: CallCtx) -> middleware_response: ...
 
+
 class CallDispatcher(CallDispatcherInterface):
     def __init__(self, func: Callable[..., middleware_response]):
         self.func = func
@@ -75,5 +76,3 @@ class CallDispatcher(CallDispatcherInterface):
             args.append(ctx.get_object(_type))
 
         return self.func(*args)
-
-

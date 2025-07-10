@@ -1,7 +1,8 @@
 import functools
-from typing import Any, Callable
-import pytest
 import inspect
+from typing import Any, Callable
+
+import pytest
 
 
 class Param:

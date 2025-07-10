@@ -1,12 +1,11 @@
-from ast import Call
-from typing import Any, Callable
-from pydantic import BaseModel
+from typing import Any, cast
 
-from .utils import ApiFuncSig
 from .call_builder import CallCtx, CallDispatcher, CallDispatcherInterface
-from .responses import InheritedResponses, BaseHeaders, Response, middleware_response
-from .request import RequestCtx
-from typing import cast
+from .responses.responses import (
+    InheritedResponses,
+    middleware_response,
+)
+from .utils import ApiFuncSig
 
 
 class CallNext:
@@ -20,8 +19,10 @@ class CallNext:
             self.ctx.set_object(provide.__class__, provide)
         return cast(InheritedResponses, self.dispatcher.dispatch(self.ctx))
 
+
 class Middleware:
     middleware = None
+
     def __init__(self):
         self.call_dispatcher = CallDispatcher(self.process)
         self.func_sig = ApiFuncSig.from_func(self.process)
@@ -46,8 +47,8 @@ class Middleware:
         combined.append(self)
         return combined
 
-class MiddlewareDispatcher(CallDispatcherInterface):
 
+class MiddlewareDispatcher(CallDispatcherInterface):
     def __init__(self, middleware: Middleware, dispatcher: CallDispatcherInterface):
         self.middleware = middleware
         self.dispatcher = dispatcher

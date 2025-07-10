@@ -1,5 +1,5 @@
-from typing import Literal, Protocol, Any, Self, Union, get_args, get_origin, cast
 from types import get_original_bases
+from typing import Any, Union, get_args, get_origin
 
 
 def parse_generic(type_: Any, target_type: type) -> tuple[Any] | None:
@@ -40,6 +40,7 @@ def parse_generic(type_: Any, target_type: type) -> tuple[Any] | None:
                 generic_args.append(param)
             return parse_generic(generic_class[*generic_args], target_type)
     return None
+
 
 def parse_union_generic(type_: Any, target_type: type) -> list[tuple[Any]]:
     if get_origin(type_) is Union:
