@@ -1,6 +1,6 @@
 [project]
 name = "shatter-api"
-version = "v0.1.1"
+version = "v0.1.2"
 description = "A self-hosted, pluggable mirror for secret stores providing a consistent API & offline access for your secrets."
 authors = [
     {name = "ripple",email = "github@ripplefcl.com>, tigattack <?"}
