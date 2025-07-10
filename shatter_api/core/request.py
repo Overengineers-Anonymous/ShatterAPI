@@ -39,10 +39,11 @@ class RequestCtx:
         if headers is None:
             headers = {}
         else:
-            headers = {from_header_name(k): v for k, v in headers.items()} # FIXME: handle headers with underscores
+            headers = {from_header_name(k): v for k, v in headers.items()}  # FIXME: handle headers with underscores
         if query_params is None:
             query_params = {}
         return cls(req_type=req_type, body=body, headers=headers, query_params=query_params)
+
 
 
 class RequestBody(BaseModel): ...

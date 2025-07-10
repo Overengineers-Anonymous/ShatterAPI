@@ -1,19 +1,22 @@
-from re import L, U
+from ast import In
 from typing import Literal, Protocol, Any, Self, Union, get_args, get_origin, cast
 from pydantic import BaseModel, ConfigDict, ValidationError
 from types import get_original_bases
 from .request import RequestBody, RequestHeaders, RequestQueryParams
 from .statuses import HTTP_STATUS_CODES
+from .type_extraction import parse_generic
 
 
 class BaseHeaders(BaseModel):
     model_config = ConfigDict(frozen=True)
+
 
 def to_header_name(header: str) -> str:
     """
     Converts a header name to the format used in the header dictionary.
     """
     return header.replace("_", "-").title()
+
 
 class Response[T: BaseModel | str, C: int = Literal[200], H: BaseHeaders = BaseHeaders]:
     def __init__(self, body: T, code: C, header: H = BaseHeaders()) -> None:
@@ -48,6 +51,7 @@ class Response[T: BaseModel | str, C: int = Literal[200], H: BaseHeaders = BaseH
             final_headers[to_header_name(header)] = value
         return final_headers
 
+class InheritedResponses: ...
 
 class ResponseInfo:
     def __init__(self, body: BaseModel, code: int, header: BaseModel | None = None) -> None:
@@ -58,6 +62,14 @@ class ResponseInfo:
     def __repr__(self) -> str:
         return f"ResponseInfo(body={self.body}, code={self.code}, header={self.header})"
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ResponseInfo):
+            return False
+        return (
+            self.body == other.body
+            and self.code == other.code
+            and self.header == other.header
+        )
 
 class JsonHeaders(BaseHeaders):
     """
@@ -114,6 +126,8 @@ class ValidationErrorData(BaseModel):
     detail: list[ValidationErrorInfo] = []
     kind: str
 
+middleware_response = Response[BaseModel, int, BaseHeaders] | InheritedResponses
+
 
 class ValidationErrorResponse(JsonResponse[ValidationErrorData, Literal[422], JsonHeaders]):
     def __init__(self, error_data: ValidationErrorData):
@@ -155,67 +169,43 @@ class ValidationErrorResponse(JsonResponse[ValidationErrorData, Literal[422], Js
         return cls(ValidationErrorData(detail=errors, kind=name_mapping.get(error.title, "unknown")))
 
 
-def _parse_rsp_generic(type_: Any) -> list[ResponseInfo]:
-    """
-    Parses a generic response type and extracts response information.
-
-    This function analyzes a generic type annotation (typically related to API response types)
-    and returns a list of `ResponseInfo` objects describing the response body, status code,
-    and headers. It recursively traverses the type's base classes to collect all relevant
-    response information.
-
-    Args:
-        type_ (Any): The generic type annotation to parse, expected to be a specialization
-            of a `Response` type or a type with `Response` in its inheritance hierarchy.
-
-    Returns:
-        list[ResponseInfo]: A list of `ResponseInfo` objects extracted from the given type.
-
-    Note:
-        This function relies on internal attributes such as `__type_params__`, `__args__`,
-        and utility functions like `get_args`, `get_origin`, and `get_original_bases`.
-        It is intended for advanced use cases involving generic type introspection.
-    """
-    param_map = {}  # what the fuck is this, read this at your own peril
-    args = get_args(type_)
-    origin_type = get_origin(type_)
-    if origin_type is Response:
-        return [ResponseInfo(body=args[0], code=get_args(args[1])[0], header=args[2] if len(args) > 2 else None)]
-    type_params = origin_type.__type_params__
-    for name, type_ in zip(type_params, args):
-        param_map[name] = type_
-    base_reponses = []
-    for base_type in get_original_bases(origin_type):
-        if issubclass(get_origin(base_type), Response):
-            generic_args = []
-            for arg in base_type.__args__:
-                generic_args.append(param_map.get(arg))
-            base_reponses += _parse_rsp_generic(base_type[*generic_args])
-    return base_reponses
-
-
-def _parse_response(type_: Any) -> list[ResponseInfo]:
+def _parse_response(type_: Any, target_type: type) -> tuple[Any, ...] | type[InheritedResponses] | None:
     origin_type = get_origin(type_)
     if issubclass(type_, BaseModel):
-        return _parse_rsp_generic(
+        return parse_generic(
             JsonResponse[
                 type_,
                 200,
-            ]
+            ],
+            Response,
         )
     if origin_type:
         if issubclass(origin_type, Response):
-            return _parse_rsp_generic(type_)
-        if origin_type is Literal:
-            literal = get_args(type_)
-            responses = []
-            for arg in literal:
-                responses += _parse_response(arg)
-            return responses
-    return []
+            return parse_generic(type_, target_type)
+    else:
+        if issubclass(type_, InheritedResponses):
+                return InheritedResponses
+    return None
+
+def dedupe_responses(responses: list[ResponseInfo]) -> list[ResponseInfo]:
+    """
+    Deduplicates a list of ResponseInfo objects based on their body, code, and header attributes.
+    Args:
+        responses (list[ResponseInfo]): The list of ResponseInfo objects to deduplicate.
+    Returns:
+        list[ResponseInfo]: A new list containing unique ResponseInfo objects.
+    """
+    seen = set()
+    unique_responses = []
+    for response in responses:
+        key = (response.body, response.code, response.header)
+        if key not in seen:
+            seen.add(key)
+            unique_responses.append(response)
+    return unique_responses
 
 
-def get_response_info(type_: Any):
+def get_response_info(type_: Any, inherited_responses: list[ResponseInfo]) -> list[ResponseInfo]:
     """
     Extracts and returns a list of ResponseInfo objects based on the provided type annotation.
     If the provided type is a Union, it iterates through each type in the Union and collects
@@ -227,11 +217,27 @@ def get_response_info(type_: Any):
         list[ResponseInfo]: A list of ResponseInfo objects extracted from the provided type annotation.
     """
 
-    responses: list[ResponseInfo] = []
+    response_args: list[tuple[Any, ...] | None | type[InheritedResponses]] = []
     if get_origin(type_) is Union:
         union_args = get_args(type_)
         for arg in union_args:
-            responses += _parse_response(arg)
+            response_args.append(_parse_response(arg, Response))
     else:
-        responses += _parse_response(type_)
-    return responses
+        response_args.append(_parse_response(type_, Response))
+    responses: list[ResponseInfo] = []
+    for response_arg in response_args:
+
+        if response_arg is not None and isinstance(response_arg, tuple):
+            body, code, header = response_arg
+            if get_origin(code) is Literal:
+                literal_args = get_args(code)
+                if literal_args:
+                    code = literal_args[0]
+                else:
+                    raise ValueError("Literal code must have at least one value")
+            code = cast(int, code)
+            responses.append(ResponseInfo(body=body, code=code, header=header))
+        elif response_arg and issubclass(response_arg, InheritedResponses):
+            responses.extend(inherited_responses)
+
+    return dedupe_responses(responses)

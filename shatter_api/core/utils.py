@@ -2,7 +2,7 @@ import inspect
 from typing import Any, Callable, Union, get_origin, get_args
 
 from pydantic import BaseModel
-from .responses import Response
+from .responses import InheritedResponses, Response
 
 
 def has_base(cls: type, base_cls: type):
@@ -94,8 +94,10 @@ class ApiFuncSig:
         else:
             union_args = (self.return_type,)
         for type_ in union_args:
-            origin = get_origin(type_)
+            origin = get_origin(type_) or type_
             if origin and issubclass(origin, Response):
+                continue
+            elif origin and issubclass(origin, InheritedResponses):
                 continue
             elif type_ is str:
                 continue

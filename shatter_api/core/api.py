@@ -11,11 +11,13 @@ import functools
 from pydantic import BaseModel, ValidationError
 
 from .request import RequestBody, RequestCtx, RequestHeaders, RequestQueryParams
-from .responses import BaseHeaders, Response, ResponseInfo, ValidationErrorResponse, get_response_info
+from .responses import BaseHeaders, Response, ResponseInfo, ValidationErrorResponse, get_response_info, middleware_response
 from .utils import has_base, ApiFuncSig
-from .middlewear import Middleware
+from .middlewear import CallNext, Middleware, MiddlewareDispatcher
+from .call_builder import CallDispatcher, CallCtx, CallDispatcherInterface
 
-class ApiDescriptor(Protocol):
+
+class Api(Protocol):
     mapping: "Mapping"
 
     def __init_subclass__(cls) -> None:
@@ -30,30 +32,47 @@ class ApiEndpoint:
     Represents a single API endpoint with a specific path and function signature.
     """
 
-    def __init__(self, path: str, func: Callable, middleware: list[Middleware] | None = None):
+    def __init__(self, path: str, func: Callable, middlewares: list[Middleware]):
         self.path = path
         self.func_sig = ApiFuncSig.from_func(func)
-        self._owner: type[ApiDescriptor] | None = None
-        self.func = func
-        self.middleware = self.build_middleware(middleware)
+        self.call_dispatcher = CallDispatcher(func)
+        self._owner: type[Api] | None = None
+        self.middlewares = self._expand_middleware(middlewares)
+
+    def _expand_middleware(self, middlewares: list[Middleware]) -> list[Middleware]:
+        """
+        Expand the middleware list by including the expanded middleware of each item.
+        """
+        expanded = []
+        for middleware in middlewares:
+            if isinstance(middleware, Middleware):
+                expanded.extend(middleware.expanded_middleware)
+            else:
+                raise TypeError(f"Middleware '{middleware.__class__}' is not an instance of Middleware")
+        return self._dedupe_middleware(expanded)
 
     @staticmethod
-    def build_middleware(middleware: list[Middleware] | None) -> list[Middleware]:
+    def _dedupe_middleware(middlewares: list[Middleware]) -> list[Middleware]:
         """
-        Build a list of middleware for the endpoint.
+        Remove duplicate middleware from the list.
         """
-        if middleware is None:
-            return []
-        if not isinstance(middleware, list):
-            raise TypeError("Middleware must be a list of Middleware instances")
-        return middleware
+        seen = set()
+        deduped_middlewares = []
+        for middleware in middlewares:
+            if middleware not in seen:
+                seen.add(middleware)
+                deduped_middlewares.append(middleware)
+        return deduped_middlewares
 
     @property
     def response_descr(self) -> list[ResponseInfo]:
-        return get_response_info(self.func_sig.return_type)
+        responses = get_response_info(self.func_sig.return_type, [])
+        for middleware in self.middlewares[::-1]:
+            responses = get_response_info(middleware.func_sig.return_type, responses)
+        return responses
 
     @property
-    def owner(self) -> type[ApiDescriptor]:
+    def owner(self) -> type[Api]:
         if self._owner is None:
             raise RuntimeError("ApiEndpoint has no owner")
         return self._owner
@@ -67,44 +86,87 @@ class ApiEndpoint:
         return True
 
     @owner.setter
-    def owner(self, value: type[ApiDescriptor]):
-        if not has_base(value, ApiDescriptor):
+    def owner(self, value: type[Api]):
+        if not has_base(value, Api):
             raise TypeError(f"{value.__name__} must inherit from ApiDescriptor to set as owner")
         self._owner = value
 
-    def _get_func_args(self, func_sig: ApiFuncSig, req: RequestCtx) -> list[Any]:
-        func_args = func_sig.args
-        args = []
-        for arg, _type in func_args.items():
-            if issubclass(_type, RequestBody):
-                args.append(_type.model_validate(req.body))
-            elif issubclass(_type, RequestCtx):
-                args.append(req)
-            elif issubclass(_type, RequestHeaders):
-                args.append(_type.model_validate(req.headers))
-            elif issubclass(_type, RequestQueryParams):
-                args.append(_type.model_validate(req.query_params))
-            else:
-                raise TypeError(f"Unsupported type '{_type}' for argument '{arg}' in function '{func_sig.name}'")
-        return args
 
-    def __call__(self, obj: object, req: RequestCtx) -> Response[BaseModel, int, BaseHeaders]:
-        func = getattr(obj, self.func_sig.name, None)
+class ApiCallDispatcher(CallDispatcherInterface):
+    def __init__(self, func: Callable[..., middleware_response]):
+        self.calldispatcher = CallDispatcher(func)
+
+    def dispatch(self, ctx: CallCtx) -> middleware_response:
+        """
+        Dispatch the API call using the provided context.
+        """
+        if CallNext in ctx:
+            ctx.remove_object(CallNext)
+
+        return self.calldispatcher.dispatch(ctx)
+
+
+class ApiExecutor:
+    def __init__(self, api_endpoint: ApiEndpoint, obj: object):
+        self.obj = obj
+        self.api_endpoint = api_endpoint
+        self.func = self._get_func(obj)
+        self.call_dispatcher = self.build_middleware()
+
+    @property
+    def response_descr(self) -> list[ResponseInfo]:
+        return self.api_endpoint.response_descr
+
+    def _get_func(self, obj: object) -> Callable:
+        """
+        Get the function to be executed for this endpoint.
+        """
+
+        func = getattr(obj, self.api_endpoint.func_sig.name, None)
         if func is None or not callable(func):
-            raise AttributeError(f"Function '{self.func_sig.name}' not found in object '{obj.__class__.__name__}'")
-        if not self.func_sig.compatible_with(ApiFuncSig.from_func(func)):
-            raise TypeError(
-                f"Function signature for '{self.func_sig.name}' in '{obj.__class__.__name__}' is not compatible with endpoint '{self.path}' defined in '{self.owner.__name__}'"
+            raise AttributeError(
+                f"Function '{self.api_endpoint.func_sig.name}' not found in object '{obj.__class__.__name__}'"
             )
+        if not self.api_endpoint.func_sig.compatible_with(ApiFuncSig.from_func(func)):
+            raise TypeError(
+                f"Function signature for '{self.api_endpoint.func_sig.name}' in '{obj.__class__.__name__}' is not compatible with endpoint '{self.api_endpoint.path}' defined in '{self.api_endpoint.owner.__name__}'"
+            )
+        return func
+
+    def build_middleware(self) -> CallDispatcherInterface:
+        """
+        Build a list of middleware for the endpoint.
+        """
+        next_dispatcher = ApiCallDispatcher(self.func)
+        for middleware in reversed(self.api_endpoint.middlewares):
+            if not isinstance(middleware, Middleware):
+                raise TypeError(f"Middleware '{middleware}' is not an instance of Middleware")
+            next_dispatcher = MiddlewareDispatcher(middleware, next_dispatcher)
+        return next_dispatcher
+
+    def __call__(self, obj: object, req: RequestCtx) -> middleware_response:
+        call_ctx = CallCtx(req)
         try:
-            args = self._get_func_args(self.func_sig, req)
+            return self.call_dispatcher.dispatch(call_ctx)
+
         except ValidationError as e:
-            return ValidationErrorResponse.from_validation_error(e, list(self.func_sig.args.values())+list(self.func_sig.kwargs.values()))
-        return cast(Response[BaseModel, int, BaseHeaders], func(*args))
+            return ValidationErrorResponse.from_validation_error(
+                e, list(self.api_endpoint.func_sig.args.values()) + list(self.api_endpoint.func_sig.kwargs.values())
+            )
+
+
+class BoundApiDescriptor:
+    def __init__(self, paths: dict[str, ApiExecutor], owner: object):
+        self.paths = paths
+        self.owner = owner
+
+    def dispatch(self, path: str, req: RequestCtx) -> Response[BaseModel, int, BaseHeaders]:
+        endpoint = self.paths[path]
+        return endpoint(self.owner, req)
 
 
 class ApiDescription:
-    def __init__(self, owner: type[ApiDescriptor]):
+    def __init__(self, owner: type[Api]):
         self.paths: dict[str, ApiEndpoint] = {}
         self.function_names: dict[str, ApiEndpoint] = {}
         self.owner = owner
@@ -127,38 +189,36 @@ class ApiDescription:
         self.function_names[api_endpoint.func_sig.name] = api_endpoint
         self.paths[path] = api_endpoint
 
-    def get_api_endpoint(self, path: str) -> ApiEndpoint:
-        if path not in self.paths:
-            raise KeyError(f"Path '{path}' not found in API description")
-        return self.paths[path]
-
-
-class BoundApiDescriptor:
-    def __init__(self, api_description: ApiDescription, owner: object):
-        self.api_description = api_description
-        self.owner = owner
-
-    @property
-    def paths(self) -> dict[str, ApiEndpoint]:
-        return self.api_description.paths
-
-    def dispatch(self, path: str, req: RequestCtx) -> Response[BaseModel, int, BaseHeaders]:
-        endpoint = self.api_description.get_api_endpoint(path)
-        return endpoint(self.owner, req)
+    def bind(self, obj: object) -> BoundApiDescriptor:
+        """
+        Bind the API description to an object instance.
+        This allows the API endpoints to be executed with the instance as the owner.
+        """
+        if not has_base(obj.__class__, Api):
+            raise TypeError(f"{obj.__class__.__name__} must inherit from ApiDescriptor to bind API description")
+        paths = {}
+        for path, api_endpoint in self.paths.items():
+            api_executor = ApiExecutor(api_endpoint, obj)
+            paths[path] = api_executor
+        bound_api_descr = BoundApiDescriptor(paths, obj)
+        return bound_api_descr
 
 
 class Mapping:
     API_DESCR_NAME = "__api_descr"
     API_BOUND_NAME = "__api_descr_bound"
 
-    def __init__(self, subpath: str = ""):
+    def __init__(self, subpath: str = "", middleware: list[Middleware] | None = None):
+        self.middleware = middleware or []
         self.subpath = subpath
         self.routes: dict[str, ApiEndpoint] = {}
-        self._owner: type[ApiDescriptor] | None = None
+        self._owner: type[Api] | None = None
 
     def route(self, path: str, middleware: list[Middleware] | None = None) -> Callable:
+        middleware = middleware or self.middleware
+
         def register(func: Callable) -> Callable:
-            self.routes[path] = ApiEndpoint(path, func, middleware)
+            self.routes[path] = ApiEndpoint(path, func, self.middleware + middleware)
             return func
 
         return register
@@ -174,14 +234,14 @@ class Mapping:
         return api_description
 
     @property
-    def owner(self) -> type[ApiDescriptor]:
+    def owner(self) -> type[Api]:
         if self._owner is None:
             raise RuntimeError("Mapping has not been initialized properly")
         return self._owner
 
     def __set_name__(self, owner, name):
         self._owner = owner
-        if not has_base(owner, ApiDescriptor):
+        if not has_base(owner, Api):
             raise TypeError(f"{owner.__name__} must inherit from ApiDescriptor to use Mapping")
         if name != "mapping":
             raise TypeError(f"Mapping must be named 'mapping', not '{name}'")
@@ -192,16 +252,16 @@ class Mapping:
     def __get__(self, obj: None, objtype: type) -> "Mapping": ...
 
     @overload
-    def __get__(self, obj: ApiDescriptor, objtype: type) -> BoundApiDescriptor: ...
+    def __get__(self, obj: Api, objtype: type) -> BoundApiDescriptor: ...
 
-    def __get__(self, obj: ApiDescriptor | None, objtype: type | None = None) -> "BoundApiDescriptor | Mapping":
+    def __get__(self, obj: Api | None, objtype: type | None = None) -> "BoundApiDescriptor | Mapping":
         if obj is None and objtype is not None:
             return self
 
         if obj is None:
             raise TypeError("Mapping cannot be accessed without an instance or type")
 
-        if not has_base(obj.__class__, ApiDescriptor):
+        if not has_base(obj.__class__, Api):
             raise TypeError(f"{obj.__class__.__name__} must inherit from ApiDescriptor to use Mapping")
 
         api_description: ApiDescription | None = getattr(obj, self.API_DESCR_NAME, None)
@@ -209,12 +269,12 @@ class Mapping:
             raise RuntimeError(f"{obj.__class__.__name__} has not built its API description yet")
         bound_api_descr: BoundApiDescriptor | None = getattr(obj, self.API_BOUND_NAME, None)
         if bound_api_descr is None:
-            bound_api_descr = BoundApiDescriptor(api_description, obj)
+            bound_api_descr = api_description.bind(obj)
             setattr(obj, self.API_BOUND_NAME, bound_api_descr)
         return bound_api_descr
 
 
-class RouteMap[T: "ApiDescriptor"]:
+class RouteMap[T: "Api"]:
     """
     Manages routing configuration for API descriptors.
 
@@ -271,4 +331,4 @@ class RouteMap[T: "ApiDescriptor"]:
         raise NotImplementedError("Child casting not yet implemented")
 
 
-route_map = RouteMap(".", ApiDescriptor)
+route_map = RouteMap(".", Api)

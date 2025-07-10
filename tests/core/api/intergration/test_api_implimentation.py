@@ -1,5 +1,5 @@
 from shatter_api.core.api import Mapping
-from shatter_api.core.api import ApiDescriptor
+from shatter_api.core.api import Api
 from typing import Protocol
 import pytest
 

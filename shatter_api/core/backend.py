@@ -1,14 +1,15 @@
 from .request import ReqType
 from .responses import NotFoundResponse
-from .api import ApiDescriptor, RequestCtx
+from .api import Api, RequestCtx
 from urllib.parse import parse_qs
+
 
 class WsgiDispatcher:
     """
     A WSGI dispatcher that handles requests and responses.
     """
 
-    def __init__(self, api_descriptor: ApiDescriptor):
+    def __init__(self, api_descriptor: Api):
         self.api_descriptor = api_descriptor
 
     def __call__(self, environ, start_response):

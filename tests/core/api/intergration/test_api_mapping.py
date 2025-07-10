@@ -1,9 +1,10 @@
-from shatter_api.core.api import Mapping, ApiDescriptor
+from shatter_api.core.api import Mapping, Api
 from typing import Protocol
 import pytest
 
+
 def test_api_descr_overwrite():
-    class TestApi(ApiDescriptor, Protocol):
+    class TestApi(Api, Protocol):
         mapping = Mapping()
 
         @mapping.route("/test")
@@ -15,7 +16,7 @@ def test_api_descr_overwrite():
         @mapping.route("/test")
         def test_method(self) -> str: ...
 
-    class TestApi3(ApiDescriptor, Protocol):
+    class TestApi3(Api, Protocol):
         mapping = Mapping()
 
         @mapping.route("/test")
@@ -29,7 +30,7 @@ def test_api_descr_overwrite():
 
 
 def test_api_descr_path_rebind_error():
-    class TestApi(ApiDescriptor, Protocol):
+    class TestApi(Api, Protocol):
         mapping = Mapping()
 
         @mapping.route("/test")
@@ -45,7 +46,7 @@ def test_api_descr_path_rebind_error():
 
 
 def test_api_descr_function_rebind_error():
-    class TestApi(ApiDescriptor, Protocol):
+    class TestApi(Api, Protocol):
         mapping = Mapping()
 
         @mapping.route("/test")
@@ -60,11 +61,11 @@ def test_api_descr_function_rebind_error():
             mapping = Mapping()
 
             @mapping.route("/test2")
-            def test_method(self) -> str: ... # Rebinding the same function name should raise an error
+            def test_method(self) -> str: ...  # Rebinding the same function name should raise an error
 
 
 def test_invalid_overwrite():
-    class TestApi(ApiDescriptor, Protocol):
+    class TestApi(Api, Protocol):
         mapping = Mapping()
 
         @mapping.route("/test")
@@ -82,8 +83,9 @@ def test_invalid_overwrite():
             def test_method(self, a: int) -> str:  # This should not raise an error as it inherits correctly
                 ...
 
+
 def test_incomparable_overwrite():
-    class TestApi(ApiDescriptor, Protocol):
+    class TestApi(Api, Protocol):
         mapping = Mapping()
 
         @mapping.route("/test")
@@ -103,13 +105,13 @@ def test_incomparable_overwrite():
 
 
 def test_ambiguous_overwrite():
-    class TestApi(ApiDescriptor, Protocol):
+    class TestApi(Api, Protocol):
         mapping = Mapping()
 
         @mapping.route("/test")
         def test_method(self, a: int) -> str: ...
 
-    class TestApi2(ApiDescriptor, Protocol):
+    class TestApi2(Api, Protocol):
         mapping = Mapping()
 
         @mapping.route("/test")
@@ -119,6 +121,7 @@ def test_ambiguous_overwrite():
         TypeError,
         match="Function 'test_method' in 'TestApi' is not compatible with base function in 'TestApi2'",
     ):
+
         class TestAp3(TestApi, TestApi2, Protocol):
             mapping = Mapping()
 
