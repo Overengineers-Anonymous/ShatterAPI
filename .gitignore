@@ -1,7 +1,7 @@
 __pycache__
 .pytest_cache
-**/test.py
-**/mapping.py
+**/test*.py
+
 dist
 .coverage
 **/profile.txt
