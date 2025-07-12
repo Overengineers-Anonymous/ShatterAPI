@@ -1,9 +1,4 @@
-from typing import Any, Sequence, cast
-
-from fastapi.background import P
-
-from test2 import Protocol
-
+from typing import Any, Sequence, cast, Protocol
 from .call_builder import CallCtx, CallDispatcher, CallDispatcherInterface
 from .responses.responses import (
     InheritedResponses,
