@@ -38,7 +38,7 @@ class Mapping:
         def register(func: Callable) -> Callable:
             for req_type in methods:
                 self.routes.setdefault(req_type, {})[path] = ApiEndpoint(
-                    self.subpath+path, func, req_type, self.middleware + middleware
+                    path, func, req_type, self.middleware + middleware
                 )
             return func
 
@@ -48,12 +48,14 @@ class Mapping:
         api_description = ApiDescription(owner)
         for base in owner.__mro__[::-1]:
             mapping = getattr(base, "mapping", None)
-            if isinstance(mapping, Mapping):
+            if isinstance(mapping, Mapping) and Protocol not in base.__bases__:
                 for req_type, path_data in mapping.routes.items():
                     for path, api_endpoint in path_data.items():
                         if not api_endpoint.path.startswith(self.subpath):
                             api_endpoint.path = self.subpath + api_endpoint.path
-                        api_description.add_path(req_type, path, api_endpoint)
+                            api_description.add_path(req_type, self.subpath + path, api_endpoint)
+                        else:
+                            api_description.add_path(req_type, path, api_endpoint)
         setattr(owner, self.API_DESCR_NAME, api_description)
         return api_description
 
