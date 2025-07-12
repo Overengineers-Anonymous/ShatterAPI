@@ -5,7 +5,7 @@ from ..utils import has_base
 from .descriptors import ApiDescription, BoundApiDescriptor
 from .endpoints import ApiEndpoint
 from .api import Api
-from ..request import ReqType
+from ..request.request import ReqType
 
 
 class Mapping:
@@ -25,7 +25,6 @@ class Mapping:
             for req_type in methods:
                 self.routes.setdefault(req_type, {})[path] = ApiEndpoint(path, func, req_type, self.middleware + middleware)
             return func
-
         return register
 
     def build_description(self, owner: type) -> ApiDescription:
@@ -93,61 +92,3 @@ class Mapping:
         return bound_api_descr
 
 
-# class RouteMap[T: "Api"]:
-#     """
-#     Manages routing configuration for API descriptors.
-#
-#     Provides a fluent interface for building API route hierarchies
-#     and binding implementations to specific paths.
-#     """
-#
-#     def __init__(self, root: str, descriptor: type[T]):
-#         """
-#         Initialize a route map with root path and descriptor type.
-#
-#         Args:
-#             root: Root path for this route map
-#             descriptor: ApiDescriptor type to manage
-#         """
-#         self.root = root
-#         self.api_descriptor = descriptor
-#
-#     def add_descriptor[TD](self, root: str, descriptor: "type[TD]") -> "RouteMap[TD]":
-#         """
-#         Add a child descriptor to this route map.
-#
-#         Args:
-#             root: Root path for the child descriptor
-#             descriptor: Child ApiDescriptor type
-#
-#         Returns:
-#             New RouteMap for the child descriptor
-#         """
-#         return RouteMap(self.root + root, descriptor)
-#
-#     def api_implementation(self, root: str, implementation: "T"):
-#         """
-#         Bind an API implementation to a specific root path.
-#
-#         Args:
-#             root: Root path for the implementation
-#             implementation: ApiImplementation instance
-#         """
-#         # TODO: Implement implementation binding logic
-#         pass
-#
-#     def cast_to_child(self, path: str) -> "T":
-#         """
-#         Cast this route map to a child type at the specified path.
-#
-#         Args:
-#             path: Path to cast to
-#
-#         Returns:
-#             Casted instance of the child type
-#         """
-#         # TODO: Implement child casting logic
-#         raise NotImplementedError("Child casting not yet implemented")
-#
-#
-# route_map = RouteMap(".", Api)

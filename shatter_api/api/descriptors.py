@@ -1,4 +1,4 @@
-from ..request import RequestCtx, ReqType
+from ..request.request import RequestCtx, ReqType
 from ..responses import middleware_response, MethodNotAllowedResponse
 from ..utils import has_base
 from .endpoints import ApiEndpoint, ApiExecutor

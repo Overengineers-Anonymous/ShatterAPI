@@ -4,7 +4,7 @@ from pydantic import ValidationError
 
 from ..call_builder import CallCtx, CallDispatcher, CallDispatcherInterface
 from ..middlewear import CallNext, Middleware, MiddlewareDispatcher
-from ..request import ReqType, RequestCtx
+from ..request.request import ReqType, RequestCtx
 from ..responses import (
     ResponseInfo,
     ValidationErrorResponse,

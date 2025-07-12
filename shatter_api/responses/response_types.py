@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from ..request import RequestBody, RequestHeaders, RequestQueryParams
+from ..request.request import RequestBody, RequestHeaders, RequestQueryParams
 from .responses import BaseHeaders, Response, to_header_name
 
 
@@ -37,7 +37,12 @@ class TextHeaders(BaseHeaders):
 
 class TextResponse[D: str, C: int = Literal[200], H: TextHeaders = TextHeaders](
     Response[D, C, H]
-): ...
+):
+    def __init__(self, body: D, code: C = 200, header: H = TextHeaders()) -> None:
+        if header is None:
+            super().__init__(body, code, TextHeaders())
+        else:
+            super().__init__(body, code, header)
 
 
 class NotFoundData(BaseModel):
