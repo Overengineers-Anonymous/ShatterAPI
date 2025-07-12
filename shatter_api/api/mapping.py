@@ -18,7 +18,7 @@ class Mapping:
         self,
         subpath: str = "",
         middleware: list[Middleware] | None = None,
-        placeholder_middleware: list[PlaceholderMiddleware | Middleware] | None = None,
+        placeholder_middleware: list[Middleware | type[PlaceholderMiddleware]] | None = None,
     ):
         self.placeholder_middleware = placeholder_middleware or []
         self.middleware = middleware or []
@@ -30,7 +30,7 @@ class Mapping:
         self,
         path: str,
         methods: list[ReqType] | None = None,
-        middleware: list[Middleware] | None = None,
+        middleware: list[Middleware | type[PlaceholderMiddleware]] | None = None,
     ) -> Callable:
         middleware = middleware or []
         methods = methods or [ReqType.GET]
