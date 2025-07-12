@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.4] - 2025-07-12
+### :sparkles: New Features
+- [`262ea11`](https://github.com/Overengineers-Anonymous/ShatterAPI/commit/262ea11fdfaaa4000cf2db6f78236587c4091843) - subpaths correcly and dont register Protocols *(commit by [@rippleFCL](https://github.com/rippleFCL))*
+
+### :wrench: Chores
+- [`79600d7`](https://github.com/Overengineers-Anonymous/ShatterAPI/commit/79600d7e7c5bd9adc9c0b2a13af29c82ecc234de) - bump version to v0.3.4 *(commit by [@rippleFCL](https://github.com/rippleFCL))*
+
+
 ## [v0.3.3] - 2025-07-12
 ### :bug: Bug Fixes
 - [`2bf4150`](https://github.com/Overengineers-Anonymous/ShatterAPI/commit/2bf4150dd6c819217056482aa12a39b097117947) - actually subpath *(commit by [@rippleFCL](https://github.com/rippleFCL))*
@@ -62,3 +70,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.3.1]: https://github.com/Overengineers-Anonymous/ShatterAPI/compare/v0.3.0...v0.3.1
 [v0.3.2]: https://github.com/Overengineers-Anonymous/ShatterAPI/compare/v0.3.1...v0.3.2
 [v0.3.3]: https://github.com/Overengineers-Anonymous/ShatterAPI/compare/v0.3.2...v0.3.3
+[v0.3.4]: https://github.com/Overengineers-Anonymous/ShatterAPI/compare/v0.3.3...v0.3.4
