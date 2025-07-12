@@ -38,7 +38,7 @@ class Mapping:
         def register(func: Callable) -> Callable:
             for req_type in methods:
                 self.routes.setdefault(req_type, {})[path] = ApiEndpoint(
-                    path, func, req_type, self.middleware + middleware
+                    self.subpath+path, func, req_type, self.middleware + middleware
                 )
             return func
 
