@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.1] - 2025-07-12
+### :sparkles: New Features
+- [`a6db117`](https://github.com/Overengineers-Anonymous/ShatterAPI/commit/a6db1173fdda56417ae771f51bacc1de60437e53) - added specific provider middleware *(commit by [@rippleFCL](https://github.com/rippleFCL))*
+- [`823e761`](https://github.com/Overengineers-Anonymous/ShatterAPI/commit/823e761c6b6fc62cc5ca10bbf5729602221ec2a4) - added placeholder middleware *(commit by [@rippleFCL](https://github.com/rippleFCL))*
+
+### :bug: Bug Fixes
+- [`8b5ec5f`](https://github.com/Overengineers-Anonymous/ShatterAPI/commit/8b5ec5f3cb34b4d5dda605bd70a386b0994f7208) - invalid typehinting *(commit by [@rippleFCL](https://github.com/rippleFCL))*
+
+
 ## [v0.2.0] - 2025-07-10
 ### :sparkles: New Features
 - [`51c8c20`](https://github.com/Overengineers-Anonymous/ShatterAPI/commit/51c8c20d8812d99a9a85e1565126f85932bdb87d) - added methods to route decorator *(commit by [@rippleFCL](https://github.com/rippleFCL))*
@@ -34,3 +43,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [v0.1.1]: https://github.com/Overengineers-Anonymous/ShatterAPI/compare/v0.1.0...v0.1.1
 [v0.1.2]: https://github.com/Overengineers-Anonymous/ShatterAPI/compare/v0.1.1...v0.1.2
 [v0.2.0]: https://github.com/Overengineers-Anonymous/ShatterAPI/compare/v0.1.2...v0.2.0
+[v0.3.1]: https://github.com/Overengineers-Anonymous/ShatterAPI/compare/v0.3.0...v0.3.1
