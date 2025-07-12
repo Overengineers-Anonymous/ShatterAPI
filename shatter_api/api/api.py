@@ -26,6 +26,9 @@ class RouteMap:
         """
         if not has_base(api.__class__, Api):
             raise TypeError(f"{api.__class__.__name__} must implement Api protocol")
+        if not api.mapping.is_implimented:
+            raise RuntimeError(f"API '{api.__class__.__name__}' is not fully implemented")
+        
         for path in api.mapping.methods.keys():
             self.paths[path] = api
 

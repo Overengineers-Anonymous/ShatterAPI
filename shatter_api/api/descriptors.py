@@ -16,6 +16,18 @@ class BoundApiDescriptor:
         endpoint = self.paths[req.req_type][req.path]
         return endpoint(self.owner, req)
 
+    @property
+    def is_implimented(self) -> bool:
+        """
+        Check if all endpoints are implemented.
+        An endpoint is considered implemented if it has a valid function signature and is not a placeholder.
+        """
+        for req_type, path_data in self.paths.items():
+            for path, api_endpoint in path_data.items():
+                if not api_endpoint.is_implimented:
+                    return False
+        return True
+
 
 class ApiDescription:
     def __init__(self, owner: type[Api]):
@@ -45,6 +57,9 @@ class ApiDescription:
         if req_type not in methods:
             methods.append(req_type)
         request_paths[path] = api_endpoint
+
+    def is_compatable(self, other: "ApiDescription") -> bool:
+        ...
 
     def bind(self, obj: object) -> BoundApiDescriptor:
         """

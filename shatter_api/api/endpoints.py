@@ -1,9 +1,10 @@
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Sequence, cast
+from urllib import response
 
 from pydantic import ValidationError
 
 from ..call_builder import CallCtx, CallDispatcher, CallDispatcherInterface
-from ..middlewear import CallNext, Middleware, MiddlewareDispatcher
+from ..middlewear import CallNext, Middleware, MiddlewareDispatcher, PlaceholderMiddleware
 from ..request.request import ReqType, RequestCtx
 from ..responses import (
     ResponseInfo,
@@ -21,30 +22,49 @@ class ApiEndpoint:
     Represents a single API endpoint with a specific path and function signature.
     """
 
-    def __init__(self, path: str, func: Callable, req_type: ReqType, middlewares: list[Middleware]):
+    def __init__(
+        self,
+        path: str,
+        func: Callable,
+        req_type: ReqType,
+        middlewares: list[Middleware | type[PlaceholderMiddleware]],
+    ):
         self.path = path
         self.req_type = req_type
         self.func_sig = ApiFuncSig.from_func(func)
         self.call_dispatcher = CallDispatcher(func)
         self._owner: "type[Api] | None" = None
-        self.middlewares = self._expand_middleware(middlewares)
+        self.middlewares = self._remove_placeholder_middleware(middlewares)
+        self.placeholder_middleware = self._expand_middleware(middlewares)
 
-    def _expand_middleware(self, middlewares: list[Middleware]) -> list[Middleware]:
+    def _remove_placeholder_middleware[T: Middleware | type[PlaceholderMiddleware]](
+        self, middlewares: Sequence[T]
+    ) -> list[Middleware]:
+        """
+        Remove placeholder middleware from the list.
+        """
+        trimmed: list[Middleware] = []
+        for middleware in middlewares:
+            if isinstance(middleware, Middleware):
+                trimmed.append(middleware)
+        return self._expand_middleware(trimmed)
+
+    def _expand_middleware[T: Middleware | type[PlaceholderMiddleware]](self, middlewares: Sequence[T]) -> list[T]:
         """
         Expand the middleware list by including the expanded middleware of each item.
         """
-        expanded = []
+        expanded: list[T] = []
         for middleware in middlewares:
             if isinstance(middleware, Middleware):
-                expanded.extend(middleware.expanded_middleware)
+                expanded.extend(cast(list[T], middleware.expanded_middleware))
+            elif has_base(middleware, PlaceholderMiddleware):
+                expanded.extend(cast(list[T], middleware.expanded_middleware()))
             else:
-                raise TypeError(
-                    f"Middleware '{middleware.__class__}' is not an instance of Middleware"
-                )
+                raise TypeError(f"Middleware '{middleware}' is not an instance of Middleware")
         return self._dedupe_middleware(expanded)
 
     @staticmethod
-    def _dedupe_middleware(middlewares: list[Middleware]) -> list[Middleware]:
+    def _dedupe_middleware[T: Middleware | type[PlaceholderMiddleware]](middlewares: Sequence[T]) -> list[T]:
         """
         Remove duplicate middleware from the list.
         """
@@ -56,12 +76,21 @@ class ApiEndpoint:
                 deduped_middlewares.append(middleware)
         return deduped_middlewares
 
-    @property
-    def response_descr(self) -> list[ResponseInfo]:
+    def _get_response_info(self, middlewares: Sequence[Middleware | type[PlaceholderMiddleware]]) -> set[ResponseInfo]:
         responses = get_response_info(self.func_sig.return_type, [])
-        for middleware in self.middlewares[::-1]:
+        for middleware in middlewares[::-1]:
             responses = get_response_info(middleware.func_sig.return_type, responses)
-        return responses
+        return set(responses)
+
+    @property
+    def response_descr(self) -> set[ResponseInfo]:
+        return self._get_response_info(self.middlewares)
+
+    @property
+    def is_implimented(self) -> bool:
+        response_info = self._get_response_info(self.middlewares)
+        desired_response_info = self._get_response_info(self.placeholder_middleware)
+        return response_info == desired_response_info
 
     @property
     def owner(self) -> "type[Api]":
@@ -69,20 +98,10 @@ class ApiEndpoint:
             raise RuntimeError("ApiEndpoint has no owner")
         return self._owner
 
-    @property
-    def valid(self) -> bool:
-        """
-        Check if the endpoint is valid, i.e., has a valid owner and function signature.
-        """
-
-        return True
-
     @owner.setter
     def owner(self, value: "type[Api]"):
         if not has_base(value, Api):
-            raise TypeError(
-                f"{value.__name__} must inherit from ApiDescriptor to set as owner"
-            )
+            raise TypeError(f"{value.__name__} must inherit from ApiDescriptor to set as owner")
         self._owner = value
 
 
@@ -108,7 +127,15 @@ class ApiExecutor:
         self.call_dispatcher = self.build_middleware()
 
     @property
-    def response_descr(self) -> list[ResponseInfo]:
+    def is_implimented(self) -> bool:
+        """
+        Check if the API endpoint is implemented.
+        An endpoint is considered implemented if it has a valid function signature and is not a placeholder.
+        """
+        return self.api_endpoint.is_implimented
+
+    @property
+    def response_descr(self) -> set[ResponseInfo]:
         return self.api_endpoint.response_descr
 
     def _get_func(self, obj: object) -> Callable:
@@ -134,9 +161,7 @@ class ApiExecutor:
         next_dispatcher = ApiCallDispatcher(self.func)
         for middleware in reversed(self.api_endpoint.middlewares):
             if not isinstance(middleware, Middleware):
-                raise TypeError(
-                    f"Middleware '{middleware}' is not an instance of Middleware"
-                )
+                raise TypeError(f"Middleware '{middleware}' is not an instance of Middleware")
             next_dispatcher = MiddlewareDispatcher(middleware, next_dispatcher)
         return next_dispatcher
 
@@ -148,6 +173,5 @@ class ApiExecutor:
         except ValidationError as e:
             return ValidationErrorResponse.from_validation_error(
                 e,
-                list(self.api_endpoint.func_sig.args.values())
-                + list(self.api_endpoint.func_sig.kwargs.values()),
+                list(self.api_endpoint.func_sig.args.values()) + list(self.api_endpoint.func_sig.kwargs.values()),
             )
