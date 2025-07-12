@@ -1,7 +1,7 @@
 from urllib.parse import parse_qs
 
-from .api import Api
-from .request import ReqType, RequestCtx
+from .api import RouteMap
+from .request.request import ReqType, RequestCtx
 from .responses import NotFoundResponse
 
 
@@ -10,8 +10,8 @@ class WsgiDispatcher:
     A WSGI dispatcher that handles requests and responses.
     """
 
-    def __init__(self, api_descriptor: Api):
-        self.api_descriptor = api_descriptor
+    def __init__(self, route_map: RouteMap):
+        self.route_map = route_map
 
     def __call__(self, environ, start_response):
         """
@@ -34,7 +34,7 @@ class WsgiDispatcher:
 
 
         try:
-            response = self.api_descriptor.mapping.dispatch(reqctx)
+            response = self.route_map.dispatch(reqctx)
         except KeyError:
             response = NotFoundResponse()
 

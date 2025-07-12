@@ -2,11 +2,11 @@ from types import get_original_bases
 from typing import Any, Union, get_args, get_origin
 
 
-def parse_generic(type_: Any, target_type: type) -> tuple[Any] | None:
+def parse_generic(type_: type , target_type: type) -> tuple[Any] | None:
     """
     Parses a generic response type and extracts response information.
 
-    This function analyzes a generic type annotation (typically related to API response types)
+    This function analyses a generic type annotation (typically related to API response types)
     and returns a list of `ResponseInfo` objects describing the response body, status code,
     and headers. It recursively traverses the type's base classes to collect all relevant
     response information.
@@ -27,18 +27,25 @@ def parse_generic(type_: Any, target_type: type) -> tuple[Any] | None:
     args = get_args(type_)
     origin_type = get_origin(type_) or type_
     if origin_type is target_type:
-        return args
+        if args:
+            return args
+        else: # generic type passed is relying on defaults
+            return tuple(default_arg.__default__ for default_arg in origin_type.__type_params__)
+
     type_params = origin_type.__type_params__
     for name, type_ in zip(type_params, args):
         param_map[name] = type_
     for base_type in get_original_bases(origin_type):
-        if issubclass(get_origin(base_type), target_type):
-            generic_class = get_origin(base_type)
+        origin_base_type = get_origin(base_type)
+        if origin_base_type and issubclass(origin_base_type, target_type):
             generic_args = []
             for arg in base_type.__args__:
                 param = param_map.get(arg) or arg
                 generic_args.append(param)
-            return parse_generic(generic_class[*generic_args], target_type)
+            return parse_generic(origin_base_type[*generic_args], target_type)
+        else:
+            return parse_generic(base_type, target_type)
+
     return None
 
 

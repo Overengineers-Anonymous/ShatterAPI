@@ -1,7 +1,7 @@
-from .api import Api, Mapping
+from .api import Api, Mapping, RouteMap, route_map
 from .backend import WsgiDispatcher
 from .middlewear import CallNext, Middleware
-from .request import (
+from .request.request import (
     ReqType,
     RequestBody,
     RequestCtx,
@@ -19,10 +19,12 @@ from .responses import (
     TextHeaders,
     TextResponse,
     ValidationErrorData,
-    ValidationErrorResponse,
+    ValidationErrorResponse
 )
 
 __all__ = [
+    "route_map",
+    "RouteMap",
     "Api",
     "Mapping",
     "WsgiDispatcher",
