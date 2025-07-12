@@ -55,7 +55,7 @@ class InheritedResponses(Response[BaseModel, int, BaseHeaders]): ...
 
 class ResponseInfo:
     def __init__(
-        self, body: BaseModel, code: int, header: BaseModel | None = None
+        self, body: BaseModel | str, code: int, header: BaseModel | None = None
     ) -> None:
         self.body = body
         self.header = header if header is not None else BaseModel()
@@ -72,6 +72,7 @@ class ResponseInfo:
             and self.code == other.code
             and self.header == other.header
         )
-
+    def __hash__(self) -> int:
+        return hash((self.body, self.code, self.header))
 
 middleware_response = Response[BaseModel, int, BaseHeaders] | InheritedResponses

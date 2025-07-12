@@ -1,4 +1,8 @@
-from typing import Any, cast
+from typing import Any, Sequence, cast
+
+from fastapi.background import P
+
+from test2 import Protocol
 
 from .call_builder import CallCtx, CallDispatcher, CallDispatcherInterface
 from .responses.responses import (
@@ -9,7 +13,7 @@ from .utils import ApiFuncSig
 from .type_extraction import parse_generic
 
 
-class Middleware:
+class Middleware():
     middleware = None
 
     def __init__(self):
@@ -34,6 +38,32 @@ class Middleware:
     def expanded_middleware(self) -> "list[Middleware]":
         combined = self.middleware or []
         combined.append(self)
+        return combined
+
+class PlaceholderMiddleware(Protocol):
+    """
+    A placeholder middleware that does nothing.
+    This can be used as a default middleware in cases where no specific processing is needed.
+    """
+    middleware: "list[type[PlaceholderMiddleware]] | None" = None
+    func_sig: ApiFuncSig
+
+    def __init__(self):
+        if self.__class__ is PlaceholderMiddleware:
+            raise TypeError("PlaceholderMiddleware cannot be instantiated directly.")
+        self.func_sig = ApiFuncSig.from_func(self.process)
+
+
+    def process(self, call_next: "CallNext[Any]", *args: Any, **kwargs: Any) -> middleware_response:
+        """
+        Simply calls the next middleware or endpoint without any additional processing.
+        """
+        ...
+
+    @classmethod
+    def expanded_middleware(cls) -> "Sequence[type[PlaceholderMiddleware]]":
+        combined = cls.middleware or []
+        combined.append(cls)
         return combined
 
 class CallNext[T: Any = None]:
