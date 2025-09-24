@@ -1,8 +1,8 @@
-from typing import Callable, Protocol, Sequence, overload
+from typing import Any, Callable, Protocol, Sequence, overload
 
 from fastapi.background import P
 
-from ..middlewear import Middleware, PlaceholderMiddleware
+from ..middlewear import Middleware
 from ..utils import has_base
 from .descriptors import ApiDescription, BoundApiDescriptor
 from .endpoints import ApiEndpoint
@@ -18,7 +18,7 @@ class Mapping:
         self,
         subpath: str = "",
         middleware: list[Middleware] | None = None,
-        placeholder_middleware: list[Middleware | type[PlaceholderMiddleware]] | None = None,
+        placeholder_middleware: list[Middleware | type[Protocol]] | None = None,
     ):
         self.placeholder_middleware = placeholder_middleware or []
         self.middleware = middleware or []
@@ -30,7 +30,7 @@ class Mapping:
         self,
         path: str,
         methods: list[ReqType] | None = None,
-        middleware: list[Middleware | type[PlaceholderMiddleware]] | None = None,
+        middleware: list[Middleware | type[Middleware]] | None = None,
     ) -> Callable:
         middleware = middleware or []
         methods = methods or [ReqType.GET]

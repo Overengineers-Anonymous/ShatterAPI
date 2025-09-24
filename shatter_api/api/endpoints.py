@@ -4,7 +4,7 @@ from urllib import response
 from pydantic import ValidationError
 
 from ..call_builder import CallCtx, CallDispatcher, CallDispatcherInterface
-from ..middlewear import CallNext, Middleware, MiddlewareDispatcher, PlaceholderMiddleware
+from ..middlewear import CallNext, Middleware, MiddlewareDispatcher
 from ..request.request import ReqType, RequestCtx
 from ..responses import (
     ResponseInfo,
@@ -27,7 +27,7 @@ class ApiEndpoint:
         path: str,
         func: Callable,
         req_type: ReqType,
-        middlewares: list[Middleware | type[PlaceholderMiddleware]],
+        middlewares: list[Middleware | type[Middleware]],
     ):
         self.path = path
         self.req_type = req_type
@@ -37,7 +37,7 @@ class ApiEndpoint:
         self.middlewares = self._remove_placeholder_middleware(middlewares)
         self.placeholder_middleware = self._expand_middleware(middlewares)
 
-    def _remove_placeholder_middleware[T: Middleware | type[PlaceholderMiddleware]](
+    def _remove_placeholder_middleware[T: Middleware | type[Middleware]](
         self, middlewares: Sequence[T]
     ) -> list[Middleware]:
         """
@@ -49,7 +49,7 @@ class ApiEndpoint:
                 trimmed.append(middleware)
         return self._expand_middleware(trimmed)
 
-    def _expand_middleware[T: Middleware | type[PlaceholderMiddleware]](self, middlewares: Sequence[T]) -> list[T]:
+    def _expand_middleware[T: Middleware | type[Middleware]](self, middlewares: Sequence[T]) -> list[T]:
         """
         Expand the middleware list by including the expanded middleware of each item.
         """
@@ -64,7 +64,7 @@ class ApiEndpoint:
         return self._dedupe_middleware(expanded)
 
     @staticmethod
-    def _dedupe_middleware[T: Middleware | type[PlaceholderMiddleware]](middlewares: Sequence[T]) -> list[T]:
+    def _dedupe_middleware[T: Middleware | type[Middleware]](middlewares: Sequence[T]) -> list[T]:
         """
         Remove duplicate middleware from the list.
         """
@@ -76,7 +76,7 @@ class ApiEndpoint:
                 deduped_middlewares.append(middleware)
         return deduped_middlewares
 
-    def _get_response_info(self, middlewares: Sequence[Middleware | type[PlaceholderMiddleware]]) -> set[ResponseInfo]:
+    def _get_response_info(self, middlewares: Sequence[Middleware | type[Middleware]]) -> set[ResponseInfo]:
         responses = get_response_info(self.func_sig.return_type, [])
         for middleware in middlewares[::-1]:
             responses = get_response_info(middleware.func_sig.return_type, responses)

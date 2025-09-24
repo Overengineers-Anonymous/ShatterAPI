@@ -4,6 +4,7 @@ from ..utils import has_base
 from .endpoints import ApiEndpoint, ApiExecutor
 from .api import Api
 
+
 class BoundApiDescriptor:
     def __init__(self, paths: dict[ReqType, dict[str, ApiExecutor]], methods: dict[str, list[ReqType]], owner: object):
         self.paths = paths
@@ -17,7 +18,7 @@ class BoundApiDescriptor:
         return endpoint(self.owner, req)
 
     @property
-    def is_implimented(self) -> bool:
+    def is_implemented(self) -> bool:
         """
         Check if all endpoints are implemented.
         An endpoint is considered implemented if it has a valid function signature and is not a placeholder.
@@ -58,8 +59,7 @@ class ApiDescription:
             methods.append(req_type)
         request_paths[path] = api_endpoint
 
-    def is_compatable(self, other: "ApiDescription") -> bool:
-        ...
+    def is_compatable(self, other: "ApiDescription") -> bool: ...
 
     def bind(self, obj: object) -> BoundApiDescriptor:
         """
@@ -67,9 +67,7 @@ class ApiDescription:
         This allows the API endpoints to be executed with the instance as the owner.
         """
         if not has_base(obj.__class__, Api):
-            raise TypeError(
-                f"{obj.__class__.__name__} must inherit from ApiDescriptor to bind API description"
-            )
+            raise TypeError(f"{obj.__class__.__name__} must inherit from ApiDescriptor to bind API description")
         paths: dict[ReqType, dict[str, ApiExecutor]] = {}
         for req_type, path_data in self.paths.items():
             request_paths = paths.setdefault(req_type, {})

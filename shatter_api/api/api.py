@@ -6,6 +6,7 @@ from ..request.request import RequestCtx
 if TYPE_CHECKING:
     from .mapping import Mapping
 
+
 class Api(Protocol):
     mapping: "Mapping"
 
@@ -26,13 +27,14 @@ class RouteMap:
         """
         if not has_base(api.__class__, Api):
             raise TypeError(f"{api.__class__.__name__} must implement Api protocol")
-        if not api.mapping.is_implimented:
+        if not api.mapping.is_implemented:
             raise RuntimeError(f"API '{api.__class__.__name__}' is not fully implemented")
-        
+
         for path in api.mapping.methods.keys():
             self.paths[path] = api
 
     def dispatch(self, ctx: RequestCtx):
         return self.paths[ctx.path].mapping.dispatch(ctx)
+
 
 route_map = RouteMap()

@@ -1,6 +1,6 @@
 from .api import Api, Mapping, RouteMap, route_map
 from .backend import WsgiDispatcher
-from .middlewear import CallNext, Middleware, PlaceholderMiddleware
+from .middlewear import CallNext, Middleware
 from .request.request import (
     ReqType,
     RequestBody,
@@ -23,7 +23,6 @@ from .responses import (
 )
 
 __all__ = [
-    "PlaceholderMiddleware",
     "route_map",
     "RouteMap",
     "Api",
